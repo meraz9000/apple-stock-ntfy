@@ -1,0 +1,32 @@
+# iPhone 18 Pro stock → ntfy
+
+Checks Apple Store in-store pickup for the iPhone 18 Pro Max (and optionally Pro) at stores within 50 miles of ZIP 30096. It runs on GitHub Actions and pushes alerts to the ntfy app.
+
+- **Every 10 min:** an urgent alert as soon as a tracked size/color appears at a store. Tap it to open that exact phone on apple.com.
+- **Every hour:** a digest of every tracked phone that's in stock, and which stores have it.
+
+## Setup
+
+1. Install **ntfy** on your iPhone, tap **+**, and subscribe to your topic (the value of the NTFY_TOPIC secret).
+2. The secret lives in **Settings → Secrets and variables → Actions**.
+3. To test: **Actions → iPhone stock check → Run workflow**, choose mode `test`. You should get a "connected" push plus the current stock.
+
+## Choosing phones
+
+Edit `config.json`:
+
+```json
+"track": {
+  "promax": { "storages": ["256gb", "512gb"], "colors": ["silver", "burgundy"] },
+  "pro":    { "storages": [], "colors": [] }
+}
+```
+
+The tracker watches every storage × color combination listed. Storages: `256gb 512gb 1tb 2tb`. Colors: `black silver glacier burgundy`. To skip one specific combo, add its part number to `exclude` (for example `"MJW64LL/A"`). Set `hourly_summary_when_nothing_in_stock` to `true` if you want an hourly "nothing yet" ping.
+
+## Notes
+
+- Keep the repo **public** so Actions minutes are free and unlimited. The topic name stays private as a secret.
+- GitHub can delay scheduled runs by a few minutes at busy times.
+- GitHub pauses schedules in repos with no activity for 60 days. If that happens, re-enable it from the Actions tab.
+- If Apple blocks GitHub's servers, you'll get a low-priority "can't reach Apple" push (at most once every 6 hours).
