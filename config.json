@@ -5,7 +5,7 @@
 
   "track": {
     "promax": {
-      "storages": ["256gb", "512gb", "1tb", "2tb"],
+      "storages": ["256gb", "512gb"],
       "colors": ["black", "silver", "glacier", "burgundy"]
     },
     "pro": {
