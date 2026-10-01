@@ -77,40 +77,46 @@ class Blocked(Exception):
     pass
 
 
-def fetch_chunk(parts, zip_code):
-    q = [("fae", "true"), ("pl", "true"), ("mts.0", "regular"), ("mts.1", "compact"),
-         ("searchNearby", "true"), ("location", zip_code)]
-    q += [(f"parts.{i}", p) for i, p in enumerate(parts)]
-    url = "https://www.apple.com/shop/fulfillment-messages?" + urllib.parse.urlencode(q)
+def _get_json(url):
     req = urllib.request.Request(url, headers={
         "User-Agent": UA,
         "Accept": "application/json, text/plain, */*",
         "Accept-Language": "en-US,en;q=0.9",
         "Referer": "https://www.apple.com/shop/buy-iphone/iphone-18-pro",
     })
-    last = None
-    for attempt in range(4):
-        try:
-            with urllib.request.urlopen(req, timeout=30) as r:
-                body = r.read().decode("utf-8", "replace")
-            data = json.loads(body)
-            pm = data["body"]["content"]["pickupMessage"]
-            if "stores" not in pm:
-                raise RuntimeError(pm.get("errorMessage") or "No stores in response")
-            return pm["stores"]
-        except urllib.error.HTTPError as e:
-            last = f"HTTP {e.code}"
-            if e.code in (403, 429, 503, 541):
-                time.sleep(5 * (attempt + 1))
-                continue
-            raise
-        except (json.JSONDecodeError, KeyError) as e:
-            last = f"Bad response ({e.__class__.__name__})"
-            time.sleep(5 * (attempt + 1))
-        except urllib.error.URLError as e:
-            last = str(e.reason)
-            time.sleep(5 * (attempt + 1))
-    raise Blocked(last)
+    with urllib.request.urlopen(req, timeout=30) as r:
+        return json.loads(r.read().decode("utf-8", "replace"))
+
+
+# Two Apple endpoints return the same store data. "pickup-message" works from
+# datacenter IPs (GitHub Actions); "fulfillment-messages" is the fallback.
+ENDPOINTS = [
+    ("https://www.apple.com/shop/retail/pickup-message", lambda d: d["body"]["stores"]),
+    ("https://www.apple.com/shop/fulfillment-messages", lambda d: d["body"]["content"]["pickupMessage"]["stores"]),
+]
+
+
+def fetch_chunk(parts, zip_code):
+    q = [("fae", "true"), ("pl", "true"), ("mts.0", "regular"), ("mts.1", "compact"),
+         ("searchNearby", "true"), ("location", zip_code)]
+    q += [(f"parts.{i}", p) for i, p in enumerate(parts)]
+    qs = urllib.parse.urlencode(q)
+    errors = []
+    for attempt in range(3):
+        for base, extract in ENDPOINTS:
+            try:
+                stores = extract(_get_json(base + "?" + qs))
+                if isinstance(stores, list):
+                    return stores
+                errors.append(f"{base.rsplit('/', 1)[1]}: no stores")
+            except urllib.error.HTTPError as e:
+                errors.append(f"{base.rsplit('/', 1)[1]}: HTTP {e.code}")
+            except (json.JSONDecodeError, KeyError, TypeError) as e:
+                errors.append(f"{base.rsplit('/', 1)[1]}: bad response ({e.__class__.__name__})")
+            except urllib.error.URLError as e:
+                errors.append(f"{base.rsplit('/', 1)[1]}: {e.reason}")
+        time.sleep(5 * (attempt + 1))
+    raise Blocked("; ".join(errors[-2:]))
 
 
 def check(cfg, parts):
