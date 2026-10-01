@@ -1,0 +1,20 @@
+{
+  "zip": "30096",
+  "radius_miles": 50,
+  "carrier_for_links": "t-mobile",
+
+  "track": {
+    "promax": {
+      "storages": ["256gb", "512gb", "1tb", "2tb"],
+      "colors": ["black", "silver", "glacier", "burgundy"]
+    },
+    "pro": {
+      "storages": [],
+      "colors": []
+    }
+  },
+
+  "exclude": [],
+
+  "hourly_summary_when_nothing_in_stock": false
+}
